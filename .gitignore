@@ -1,0 +1,4 @@
+characters/
+node_modules/
+games/
+package-lock.json

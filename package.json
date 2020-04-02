@@ -1,0 +1,13 @@
+{
+  "name": "wild-magic-surge-bot",
+  "version": "1.0.0",
+  "description": "My First Discord Bot",
+  "main": "bot.js",
+  "author": "Rocky Camacho",
+  "dependencies": {
+    "discord.io": "https://github.com/woor/discord.io/tarball/gateway_v6",
+    "fs": "0.0.1-security",
+    "winston": "^3.2.1",
+    "xml2js": "^0.4.23"
+  }
+}
