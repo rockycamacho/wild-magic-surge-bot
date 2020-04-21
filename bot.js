@@ -1,3 +1,5 @@
+//https://discordapp.com/oauth2/authorize?&client_id=693371734765731901&scope=bot&permissions=133184
+
 var Discord = require('discord.io');
 var logger = require('winston');
 var xml2js = require('xml2js');
@@ -129,7 +131,7 @@ surges[surges.length] = "You regain all expended sorcery points."
 
 displayInitiativeOrder = false;
 numberOfPosts = 0;
-showInitiativeOrderEvery = 7;
+showInitiativeOrderEvery = 10;
 
 function showInitiativeOrderDisplay(postCount) {
 	displayInitiativeOrder = true;
@@ -141,19 +143,31 @@ function getInitiativeOrderMessage(channelID) {
 	var initiativeOrder = getInitiativeOrder(channelID);
 	logger.info(initiativeOrder);
 	
-	if(initiativeOrder.length > 0) {
-		var message = '**Initiative Order:** \n';
+	var message = {
+		title: 'Initiative Order'
+	};
+	if(initiativeOrder != null && initiativeOrder.length > 0) {
+		var description = '';
+		//var fields = [];
 		for(var i = 0; i < initiativeOrder.length; i++) {
 			var item = initiativeOrder[i];
 			logger.info(item);
-			message += '>\t' + item.initiative.toString().lpad(' ', 2) + '\t\t' + item.name + '\n'
+			description += '>\t' + item.initiative.toString().lpad(' ', 2) + '\t\t' + item.name + '\n'
+			/*
+			fields[fields.length] = {
+				name: item.name,
+				value: '' + item.initiative
+			};
+			*/
 		}
-		return message;	
+		message.description = description;
+		//message.fields = fields;
 	}
 	else {
-		return 'Error: Set initiatives first';
+		message.description = 'Error: Set initiatives first';
 	}
-	
+	logger.info(message);
+	return message;	
 }
 
 function getInitiativeOrder(channelID) {
@@ -174,8 +188,15 @@ function getRndInteger(min, max) {
   return Math.floor(Math.random() * (max - min + 1) ) + min;
 }
 
-function rollForDeathSavingThrow(character, attribute, rollType, callback) {
-	fs.readFile("./characters/" + character + ".json", 'utf8', function(err, contents) {
+function formatRoll(roll, maxNumber) {
+	if(roll == maxNumber) {
+		return '**' + roll + '**';
+	}
+	return roll;
+}
+
+function rollForDeathSavingThrow(characterName, attribute, rollType, callback) {
+	fs.readFile("./characters/" + characterName + ".json", 'utf8', function(err, contents) {
 		if(!err) {
 			parser.parseString(contents, function(error, result) {
 				if(error === null) {
@@ -188,38 +209,56 @@ function rollForDeathSavingThrow(character, attribute, rollType, callback) {
 					if(rollType == 'dis') {
 						roll = Math.min(roll1, roll2);
 						if(roll1 < roll2) {
-							rollMessage = '' + roll1 + ', ~~' + roll2 +  '~~'
+							rollMessage = '' + formatRoll(roll1, 20) + ', ~~' + formatRoll(roll2, 20) +  '~~'
 						}
 						else {
-							rollMessage = '~~' + roll1 + '~~, ' + roll2 +  ''
+							rollMessage = '~~' + formatRoll(roll1, 20) + '~~, ' + formatRoll(roll2, 20) +  ''
 						}
 					}
 					if(rollType == 'adv') {
 						roll = Math.max(roll, roll2);
 						if(roll1 > roll2) {
-							rollMessage = '' + roll1 + ', ~~' + roll2 +  '~~'
+							rollMessage = '' + formatRoll(roll1, 20) + ', ~~' + formatRoll(roll2, 20) +  '~~'
 						}
 						else {
-							rollMessage = '~~' + roll1 + '~~, ' + roll2 +  ''
+							rollMessage = '~~' + formatRoll(roll1, 20) + '~~, ' + formatRoll(roll2, 20) +  ''
 						}
 					}
 					
 					logger.info(result.character.abilityScores);
-					var message = '`' + character + '` rolled a ['+rollMessage+'] = `' + (roll) + '` on the ' + attribute + ' Saving Throw'
-					callback(message)
+					
+					callback({
+						color: 0x34A853,
+						title: characterName + ' rolls for a Death Saving Throw',
+						description: '['+rollMessage+'] = `' + (roll) + '`'
+					});
 				}
 				else {
-					callback(err)
+					callback({
+						color: 0xEA4335,
+						title: 'Error',
+						description: err,
+						footer: {
+							text: 'Death Saving Throw'
+						}
+					});
 				}
 			});
 		}
 		else {
-			callback(err)
+			callback({
+				color: 0xEA4335,
+				title: 'Error',
+				description: err,
+				footer: {
+					text: 'Death Saving Throw'
+				}
+			});
 		}
 	});
 }
 
-function rollForSavingThrow(character, attribute, rollType, callback) {
+function rollForSavingThrow(characterName, attribute, rollType, callback) {
 	var attributes = {
 		'Str': 0,
 		'Dex': 1,
@@ -228,7 +267,8 @@ function rollForSavingThrow(character, attribute, rollType, callback) {
 		'Wis': 4,
 		'Cha': 5
 	};
-	fs.readFile("./characters/" + character + ".json", 'utf8', function(err, contents) {
+	var attributeNames = ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'];
+	fs.readFile("./characters/" + characterName + ".json", 'utf8', function(err, contents) {
 		if(!err) {
 			parser.parseString(contents, function(error, result) {
 				if(error === null) {
@@ -247,33 +287,50 @@ function rollForSavingThrow(character, attribute, rollType, callback) {
 					if(rollType == 'dis') {
 						roll = Math.min(roll1, roll2);
 						if(roll1 < roll2) {
-							rollMessage = '' + roll1 + ', ~~' + roll2 +  '~~'
+							rollMessage = '' + formatRoll(roll1, 20) + ', ~~' + formatRoll(roll2, 20) +  '~~'
 						}
 						else {
-							rollMessage = '~~' + roll1 + '~~, ' + roll2 +  ''
+							rollMessage = '~~' + formatRoll(roll1, 20) + '~~, ' + formatRoll(roll2, 20) +  ''
 						}
 					}
 					if(rollType == 'adv') {
 						roll = Math.max(roll, roll2);
 						if(roll1 > roll2) {
-							rollMessage = '' + roll1 + ', ~~' + roll2 +  '~~'
+							rollMessage = '' + formatRoll(roll1, 20) + ', ~~' + formatRoll(roll2, 20) +  '~~'
 						}
 						else {
-							rollMessage = '~~' + roll1 + '~~, ' + roll2 +  ''
+							rollMessage = '~~' + formatRoll(roll1, 20) + '~~, ' + formatRoll(roll2, 20) +  ''
 						}
 					}
 					
 					logger.info(result.character.abilityScores);
-					var message = '`' + character + '` rolled a ['+rollMessage+'] + ' + (abilityScore + proficiencyScore + additionalBonus) + ' = `' + (roll + abilityScore + proficiencyScore + additionalBonus) + '` on the ' + attribute + ' Saving Throw'
-					callback(message)
+					callback({
+						color: 0x34A853,
+						title: characterName + ' rolls for a ' + attributeNames[attributes[attribute]] + ' Saving Throw',
+						description: '['+rollMessage+'] + ' + (abilityScore + proficiencyScore + additionalBonus) + ' = `' + (roll + abilityScore + proficiencyScore + additionalBonus) + '`'
+					});
 				}
 				else {
-					callback(err)
+					callback({
+						color: 0xEA4335,
+						title: 'Error',
+						description: err,
+						footer: {
+							text: attributeNames[attributes[attribute]] + 'Saving Throw'
+						}
+					});
 				}
 			});
 		}
 		else {
-			callback(err)
+			callback({
+				color: 0xEA4335,
+				title: 'Error',
+				description: err,
+				footer: {
+					text: attributeNames[attributes[attribute]] + 'Saving Throw'
+				}
+			});
 		}
 	});
 }
@@ -304,19 +361,19 @@ function rollForInitiative(characterName, rollType, channelID, callback) {
 					if(rollType == 'dis') {
 						roll = Math.min(roll1, roll2);
 						if(roll1 < roll2) {
-							rollMessage = '' + roll1 + ', ~~' + roll2 +  '~~'
+							rollMessage = '' + formatRoll(roll1, 20) + ', ~~' + formatRoll(roll2, 20) +  '~~'
 						}
 						else {
-							rollMessage = '~~' + roll1 + '~~, ' + roll2 +  ''
+							rollMessage = '~~' + formatRoll(roll1, 20) + '~~, ' + formatRoll(roll2, 20) +  ''
 						}
 					}
 					if(rollType == 'adv') {
 						roll = Math.max(roll, roll2);
 						if(roll1 > roll2) {
-							rollMessage = '' + roll1 + ', ~~' + roll2 +  '~~'
+							rollMessage = '' + formatRoll(roll1, 20) + ', ~~' + formatRoll(roll2, 20) +  '~~'
 						}
 						else {
-							rollMessage = '~~' + roll1 + '~~, ' + roll2 +  ''
+							rollMessage = '~~' + formatRoll(roll1, 20) + '~~, ' + formatRoll(roll2, 20) +  ''
 						}
 					}
 					
@@ -324,16 +381,33 @@ function rollForInitiative(characterName, rollType, channelID, callback) {
 					
 					setInitiative(characterName, roll + abilityScore, channelID);
 					
-					var message = '`' + characterName + '` rolled a ['+rollMessage+'] + ' + (abilityScore) + ' = `' + (roll + abilityScore) + '` as Initiative'
-					callback(message)
+					callback({
+						color: 0x34A853,
+						title: characterName + ' rolls for Initiative',
+						description: '['+rollMessage+'] + ' + (abilityScore) + ' = `' + (roll + abilityScore) + '`'
+					});
 				}
 				else {
-					callback(err)
+					callback({
+						color: 0xEA4335,
+						title: 'Error',
+						description: err,
+						footer: {
+							text: 'Initiative Roll'
+						}
+					});
 				}
 			});
 		}
 		else {
-			callback(err)
+			callback({
+				color: 0xEA4335,
+				title: 'Error',
+				description: err,
+				footer: {
+					text: 'Initiative Roll'
+				}
+			});
 		}
 	});
 }
@@ -392,7 +466,7 @@ function getCharacterInfo(characterName, callback) {
 					var pp = 10 + getSkillModifier(result, 'Perception');
 					var hp = characterSheet.maxHealth
 					
-					var message = '`' + characterName + '` ' + ac + 'AC ' + pp + 'PP ' + hp + 'HP'
+					var message = ac + 'AC ' + pp + 'PP ' + hp + 'HP'
 					callback(message)
 				}
 				else {
@@ -487,7 +561,7 @@ function getSkillModifier(characterSheet, skill) {
 	return abilityScore + proficiencyScore + doubleProficiencyScore + halfProficiencyScore + additionalBonus;
 }
 
-function rollForCheck(character, skill, rollType, callback) {
+function rollForCheck(characterName, skill, rollType, callback) {
 	var attributes = {
 		'Str': 0,
 		'Dex': 1,
@@ -536,7 +610,7 @@ function rollForCheck(character, skill, rollType, callback) {
 		'Performance': 5,
 		'Persuasion': 5
 	}
-	fs.readFile("./characters/" + character + ".json", 'utf8', function(err, contents) {
+	fs.readFile("./characters/" + characterName + ".json", 'utf8', function(err, contents) {
 		if(!err) {
 			parser.parseString(contents, function(error, result) {
 				if(error === null) {
@@ -547,34 +621,51 @@ function rollForCheck(character, skill, rollType, callback) {
 					if(rollType == 'dis') {
 						roll = Math.min(roll1, roll2);
 						if(roll1 < roll2) {
-							rollMessage = '' + roll1 + ', ~~' + roll2 +  '~~'
+							rollMessage = '' + formatRoll(roll1, 20) + ', ~~' + formatRoll(roll2, 20) +  '~~'
 						}
 						else {
-							rollMessage = '~~' + roll1 + '~~, ' + roll2 +  ''
+							rollMessage = '~~' + formatRoll(roll1, 20) + '~~, ' + formatRoll(roll2, 20) +  ''
 						}
 					}
 					if(rollType == 'adv') {
 						roll = Math.max(roll, roll2);
 						if(roll1 > roll2) {
-							rollMessage = '' + roll1 + ', ~~' + roll2 +  '~~'
+							rollMessage = '' + formatRoll(roll1, 20) + ', ~~' + formatRoll(roll2, 20) +  '~~'
 						}
 						else {
-							rollMessage = '~~' + roll1 + '~~, ' + roll2 +  ''
+							rollMessage = '~~' + formatRoll(roll1, 20) + '~~, ' + formatRoll(roll2, 20) +  ''
 						}
 					}
 					var modifier = getSkillModifier(result, skill);
 					
 					logger.info(result.character.abilityScores);
-					var message = '`' + character + '` rolled a ['+rollMessage+'] + ' + (modifier) + ' = `' + (roll + modifier) + '` on the ' + skill + ' Check'
-					callback(message)
+					callback({
+						color: 0x34A853,
+						title: characterName + ' rolls for a ' + skill + ' Check',
+						description: '['+rollMessage+'] + ' + (modifier) + ' = `' + (roll + modifier) + '`'
+					});
 				}
 				else {
-					callback(err)
+					callback({
+						color: 0xEA4335,
+						title: 'Error',
+						description: err,
+						footer: {
+							text: skill + ' Check'
+						}
+					});
 				}
 			});
 		}
 		else {
-			callback(err)
+			callback({
+				color: 0xEA4335,
+				title: 'Error',
+				description: err,
+				footer: {
+					text: skill + ' Check'
+				}
+			});
 		}
 	});
 }
@@ -654,10 +745,23 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 					}
 				}
 				logger.info('You rolled a ' + roll + '.\n\n' + surges[roll]);
+				bot.sendMessage({
+                    to: channelID,
+					embed: {
+						color: 3447003,
+						title: 'Wild Magic Surge',
+						fields: [{
+							name: 'You rolled a ['+roll+'] ',
+							value: surges[roll]
+						}]
+					},
+				});
+				/*
                 bot.sendMessage({
                     to: channelID,
                     message: 'You rolled a ' + roll + '.\n\n```' + surges[roll] + '```'
                 });
+				*/
 			break;
 			case 'thefallen':
 				logger.info('Press F');
@@ -677,19 +781,20 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				var message = 'Heal for ('
 				for(var i = 0; i < rolls.length; i++) {
 					totalHeal += parseInt(rolls[i])
-					message += rolls[i] + '' 
+					message += '[' + formatRoll(rolls[i], 4) + ']'
 					if(i + 1 < rolls.length) {
 						message += ' + '
 					}
 				}
 				totalHeal += 2
-				message += ') + 2 = ' + totalHeal
-				
-				
+				message += ') + 2 = `' + totalHeal + '`'
 				
                 bot.sendMessage({
                     to: channelID,
-                    message: message
+                    embed: {
+						title: 'Healing Potion',
+						description: message,
+					}
                 });
             break;
 			case 'ghp':
@@ -705,19 +810,20 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				var message = 'Heal for ('
 				for(var i = 0; i < rolls.length; i++) {
 					totalHeal += parseInt(rolls[i])
-					message += rolls[i] + '' 
+					message += '[' + formatRoll(rolls[i], 4) + ']'
 					if(i + 1 < rolls.length) {
 						message += ' + '
 					}
 				}
 				totalHeal += 4
-				message += ') + 4 = ' + totalHeal
+				message += ') + 4 = `' + totalHeal + '`'
 				
-				
-	
                 bot.sendMessage({
                     to: channelID,
-                    message: message
+                    embed: {
+						title: 'Greater Healing Potion',
+						description: message,
+					}
                 });
             break;
 			case 'superior':
@@ -738,19 +844,20 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				var message = 'Heal for ('
 				for(var i = 0; i < rolls.length; i++) {
 					totalHeal += parseInt(rolls[i])
-					message += rolls[i] + '' 
+					message += '[' + formatRoll(rolls[i], 4) + ']'
 					if(i + 1 < rolls.length) {
 						message += ' + '
 					}
 				}
 				totalHeal += 8
-				message += ') + 8 = ' + totalHeal
+				message += ') + 8 = `' + totalHeal + '`'
 				
-				
-	
                 bot.sendMessage({
                     to: channelID,
-                    message: message
+                    embed: {
+						title: 'Superior Healing Potion',
+						description: message,
+					}
                 });
             break;
 			case 'supreme':
@@ -773,19 +880,20 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				var message = 'Heal for ('
 				for(var i = 0; i < rolls.length; i++) {
 					totalHeal += parseInt(rolls[i])
-					message += rolls[i] + '' 
+					message += '[' + formatRoll(rolls[i], 4) + ']'
 					if(i + 1 < rolls.length) {
 						message += ' + '
 					}
 				}
 				totalHeal += 20
-				message += ') + 20 = ' + totalHeal
+				message += ') + 20 = `' + totalHeal + '`'
 				
-				
-	
                 bot.sendMessage({
                     to: channelID,
-                    message: message
+                    embed: {
+						title: 'Supreme Healing Potion',
+						description: message,
+					}
                 });
 			break;
 			case 'enc':
@@ -797,13 +905,27 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				if(roll == 1) {
 					bot.sendMessage({
 						to: channelID,
-						message: 'Rolled a ' + roll + '. Enemies approach...'
+						embed: {
+							color: 0xEA4335,
+							title: 'Encounter Check',
+							description: 'Enemies approach...',
+							footer: {
+								text: 'Rolled a [' + roll + ']'
+							}
+						}
 					});						
 				}
 				else {
 					bot.sendMessage({
 						to: channelID,
-						message: 'Rolled a ' + roll + '. It\'s quiet here...'
+						embed: {
+							color: 0x34A853,
+							title: 'Encounter Check',
+							description: 'It\'s quiet here...',
+							footer: {
+								text: 'Rolled a [' + roll + ']'
+							}
+						}
 					});
 				}
             break;
@@ -965,7 +1087,7 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				rollForDeathSavingThrow(character, 'Death', rollType, function(message) {
 					bot.sendMessage({
 						to: channelID,
-						message: message
+						embed: message
 					});
 				}); 
 			break;
@@ -976,7 +1098,7 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				rollForSavingThrow(character, 'Str', rollType, function(message) {
 					bot.sendMessage({
 						to: channelID,
-						message: message
+						embed: message
 					});
 				}); 
 			break;
@@ -988,7 +1110,7 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				rollForSavingThrow(character, 'Dex', rollType, function(message) {
 					bot.sendMessage({
 						to: channelID,
-						message: message
+						embed: message
 					});
 				}); 
 			break;
@@ -999,7 +1121,7 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				rollForSavingThrow(character, 'Con', rollType, function(message) {
 					bot.sendMessage({
 						to: channelID,
-						message: message
+						embed: message
 					});
 				}); 
 			break;
@@ -1010,7 +1132,7 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				rollForSavingThrow(character, 'Int', rollType, function(message) {
 					bot.sendMessage({
 						to: channelID,
-						message: message
+						embed: message
 					});
 				}); 
 			break;
@@ -1021,7 +1143,7 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				rollForSavingThrow(character, 'Wis', rollType, function(message) {
 					bot.sendMessage({
 						to: channelID,
-						message: message
+						embed: message
 					});
 				}); 
 			break;
@@ -1032,7 +1154,7 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				rollForSavingThrow(character, 'Cha', rollType, function(message) {
 					bot.sendMessage({
 						to: channelID,
-						message: message
+						embed: message
 					});
 				}); 
 			break;
@@ -1044,7 +1166,7 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				rollForCheck(character, 'Athletics', rollType, function(message) {
 					bot.sendMessage({
 						to: channelID,
-						message: message
+						embed: message
 					});
 				}); 
 			break;
@@ -1054,7 +1176,7 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				rollForCheck(character, 'Acrobatics', rollType, function(message) {
 					bot.sendMessage({
 						to: channelID,
-						message: message
+						embed: message
 					});
 				}); 
 			break;
@@ -1065,17 +1187,18 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				rollForCheck(character, 'Sleight of Hand', rollType, function(message) {
 					bot.sendMessage({
 						to: channelID,
-						message: message
+						embed: message
 					});
 				}); 
 			break;
+			case 'sneak':
 			case 'stealth':
 				var character = getCharacter(evt, args);
 				var rollType = getRollType(args);
 				rollForCheck(character, 'Stealth', rollType, function(message) {
 					bot.sendMessage({
 						to: channelID,
-						message: message
+						embed: message
 					});
 				}); 
 			break;
@@ -1085,7 +1208,7 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				rollForCheck(character, 'Arcana', rollType, function(message) {
 					bot.sendMessage({
 						to: channelID,
-						message: message
+						embed: message
 					});
 				}); 
 			break;
@@ -1095,7 +1218,7 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				rollForCheck(character, 'History', rollType, function(message) {
 					bot.sendMessage({
 						to: channelID,
-						message: message
+						embed: message
 					});
 				}); 
 			break;
@@ -1105,7 +1228,7 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				rollForCheck(character, 'Investigation', rollType, function(message) {
 					bot.sendMessage({
 						to: channelID,
-						message: message
+						embed: message
 					});
 				}); 
 			break;
@@ -1115,7 +1238,7 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				rollForCheck(character, 'Nature', rollType, function(message) {
 					bot.sendMessage({
 						to: channelID,
-						message: message
+						embed: message
 					});
 				}); 
 			break;
@@ -1125,7 +1248,7 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				rollForCheck(character, 'Religion', rollType, function(message) {
 					bot.sendMessage({
 						to: channelID,
-						message: message
+						embed: message
 					});
 				}); 
 			break;
@@ -1136,7 +1259,7 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				rollForCheck(character, 'Animal Handling', rollType, function(message) {
 					bot.sendMessage({
 						to: channelID,
-						message: message
+						embed: message
 					});
 				}); 
 			break;
@@ -1146,7 +1269,7 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				rollForCheck(character, 'Insight', rollType, function(message) {
 					bot.sendMessage({
 						to: channelID,
-						message: message
+						embed: message
 					});
 				}); 
 			break;
@@ -1156,7 +1279,7 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				rollForCheck(character, 'Medicine', rollType, function(message) {
 					bot.sendMessage({
 						to: channelID,
-						message: message
+						embed: message
 					});
 				}); 
 			break;
@@ -1166,7 +1289,7 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				rollForCheck(character, 'Perception', rollType, function(message) {
 					bot.sendMessage({
 						to: channelID,
-						message: message
+						embed: message
 					});
 				}); 
 			break;
@@ -1176,7 +1299,7 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				rollForCheck(character, 'Survival', rollType, function(message) {
 					bot.sendMessage({
 						to: channelID,
-						message: message
+						embed: message
 					});
 				}); 
 			break;
@@ -1186,7 +1309,7 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				rollForCheck(character, 'Deception', rollType, function(message) {
 					bot.sendMessage({
 						to: channelID,
-						message: message
+						embed: message
 					});
 				}); 
 			break;
@@ -1196,7 +1319,7 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				rollForCheck(character, 'Intimidation', rollType, function(message) {
 					bot.sendMessage({
 						to: channelID,
-						message: message
+						embed: message
 					});
 				}); 
 			break;
@@ -1206,7 +1329,7 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				rollForCheck(character, 'Performance', rollType, function(message) {
 					bot.sendMessage({
 						to: channelID,
-						message: message
+						embed: message
 					});
 				}); 
 			break;
@@ -1216,7 +1339,7 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				rollForCheck(character, 'Persuasion', rollType, function(message) {
 					bot.sendMessage({
 						to: channelID,
-						message: message
+						embed: message
 					});
 				}); 
 			break;
@@ -1226,7 +1349,7 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				rollForInitiative(character, rollType, channelID, function(message) {
 					bot.sendMessage({
 						to: channelID,
-						message: message
+						embed: message
 					});
 					
 				}); 
@@ -1239,7 +1362,11 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 				getCharacterInfo(character, function(message) {
 					bot.sendMessage({
 						to: channelID,
-						message: message
+						embed: {
+							color: 0x34A853,
+							title: character,
+							description: message
+						}
 					});
 				}); 
 			break;
@@ -1256,21 +1383,27 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 					logger.info(initativeOrderMessage);
 					bot.sendMessage({
 						to: channelID,
-						message: initativeOrderMessage
+						embed: initativeOrderMessage
 					});
 				}
 				else if('stop' == command) {
 					stopInitiativeOrderDisplay();
 					bot.sendMessage({
 						to: channelID,
-						message: 'Initiative Order display stopped.'
+						embed: {
+							title: 'Initiative Order',
+							description: 'Display has been stopped.'
+						}
 					});
 				}
 				else if('new' == command) {
 					stopInitiativeOrderDisplay();
 					bot.sendMessage({
 						to: channelID,
-						message: 'Initiative Order has been cleared.'
+						embed: {
+							title: 'Initiative Order',
+							description: 'Has been cleared.'
+						}
 					});
 				}
 				else if('clear' == command) {
@@ -1278,7 +1411,10 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 					clearInitiativeOrder(channelID);
 					bot.sendMessage({
 						to: channelID,
-						message: 'Initiative Order has been cleared.'
+						embed: {
+							title: 'Initiative Order',
+							description: 'Has been cleared.'
+						}
 					});
 				}
 				else {
@@ -1288,23 +1424,32 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 							setInitiative(characterName, null, channelID);
 							bot.sendMessage({
 								to: channelID,
-								message: characterName + ' has been removed from Initiative Order.'
+								embed: {
+									title: 'Initiative Order',
+									description: characterName + ' has been removed from Initiative Order.'
+								}
 							});
 							return;
 						}
 						else {
-							initiativeRoll = parseInt(args[1]);
+							initiativeRoll = parseFloat(args[1]);
 							setInitiative(characterName, initiativeRoll, channelID);
 							bot.sendMessage({
 								to: channelID,
-								message: 'Initiative added. To display initiative order: `!init show`'
+								embed: {
+									title: 'Initiative Order',
+									description: 'Initiative added. To display initiative order: `!init show`'
+								}
 							});
 						}						
 					}
 					else {
 						bot.sendMessage({
 							to: channelID,
-							message: 'Please include intiative roll. `!init [CharacterName] [InitiativeRoll]`'
+							embed: {
+								title: 'Initiative Order',
+								description: 'Please include intiative roll. `!init [CharacterName] [InitiativeRoll]`'
+							}
 						});
 					}
 				}
@@ -1314,7 +1459,51 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 			case 'tokenlink':
 				bot.sendMessage({
 					to: channelID,
-					message: 'http://rolladvantage.com/tokenstamp/'
+					embed: {
+						title: 'Roll Advantage Token Stamp',
+						url: 'http://rolladvantage.com/tokenstamp/',
+						description: 'Add custom borders to your character\'s photo with this website.'
+					}
+				});
+			break;
+			case 'exhaustion':
+			/*
+				var description = '';
+				description += '>\t1\t\tDisadvantage on Ability Checks\n';
+				description += '>\t2\t\tSpeed halved\n';
+				description += '>\t3\t\tDisadvantage on Attack rolls and Saving Throws\n';
+				description += '>\t4\t\tHit point maximum halved\n';
+				description += '>\t5\t\tSpeed reduced to 0\n';
+				description += '>\t6\t\tDeath\n';
+			*/
+				bot.sendMessage({
+					to: channelID,
+					embed: {
+						title: 'Exhaustion Effects',
+						url: 'https://roll20.net/compendium/dnd5e/Conditions#toc_16',
+						fields: [{
+							name: 'Level 1',
+							value: 'Disadvantage on Ability Checks'
+						},{
+							name: 'Level 2',
+							value: 'Speed halved'
+						},{
+							name: 'Level 3',
+							value: 'Disadvantage on Attack rolls and Saving Throws'
+						},{
+							name: 'Level 4',
+							value: 'Hit point maximum halved'
+						},{
+							name: 'Level 5',
+							value: 'Speed reduced to 0'
+						},{
+							name: 'Level 6',
+							value: 'Death'
+						}],
+						footer: {
+							text: 'Click the title for more details on the subject'
+						}
+					}
 				});
 			break;
             // Just add any case commands if you want to..
@@ -1328,7 +1517,7 @@ bot.on('message', function (user, userID, channelID, message, evt) {
 		logger.info(initativeOrderMessage);
 		bot.sendMessage({
 			to: channelID,
-			message: initativeOrderMessage
+			embed: initativeOrderMessage
 		});
 	}
 });
